@@ -130,10 +130,14 @@ input[aria-invalid=true]{border-color:var(--merah)}
 .tumpuk-tombol{display:grid; gap:10px; margin-top:16px}
 
 /* Monitoring terang */
-.ringkasan{display:flex; gap:8px; margin:14px 0}
-.ringkasan .sel{flex:1; border-radius:14px; padding:10px 8px; text-align:center; background:var(--kaca); -webkit-backdrop-filter:blur(16px) saturate(150%); backdrop-filter:blur(16px) saturate(150%); border:1px solid var(--tepi); box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
+.ringkasan{display:flex; flex-wrap:wrap; gap:8px; margin:14px 0}
+.ringkasan .sel{flex:1 1 120px; border-radius:14px; padding:10px 8px; text-align:center; background:var(--kaca); -webkit-backdrop-filter:blur(16px) saturate(150%); backdrop-filter:blur(16px) saturate(150%); border:1px solid var(--tepi); box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
 .ringkasan .angka{font-size:20px; font-weight:800}
 .ringkasan .label{font-size:11.5px; color:var(--redam); font-weight:600}
+.ringkasan .ket{font-size:11px; color:var(--redam); margin-top:3px}
+.judul-panel{font-size:15px; margin:16px 0 2px}
+.ket-panel{font-size:12px; color:var(--redam); margin-bottom:10px}
+.pil-lama{background:rgba(179,38,30,.10); color:var(--merah); border-color:rgba(179,38,30,.35)}
 .cari{display:flex; gap:8px; margin-bottom:10px}
 .cari input{flex:1}
 .saring{display:flex; gap:2px; border-radius:999px; padding:4px; margin-bottom:12px;
@@ -236,8 +240,7 @@ dialog::backdrop{background:rgba(43,36,22,.35)}
           <div style="margin-top:22px">
             <button type="submit" class="btn btn-utama" id="btnKirim"><span class="putar" aria-hidden="true"></span><span id="teksKirim">Kirim dan Buat Kartu Tamu</span></button>
           </div>
-          <p class="catatan">Data Anda hanya dipakai untuk keperluan kunjungan dan hanya dilihat petugas resepsionis.</p>
-          <p class="catatan"><a href="#" id="tautanAdmin" style="color:inherit">Petugas resepsionis? Masuk admin</a></p>
+
         </form>
       </div>
     </div>
@@ -308,9 +311,15 @@ dialog::backdrop{background:rgba(43,36,22,.35)}
       <label for="mTanggal" style="margin-top:0">Tanggal kunjungan</label>
       <input type="date" id="mTanggal">
       <div class="ringkasan" role="status">
-        <div class="sel"><div class="angka" id="rTotal">0</div><div class="label">Total</div></div>
-        <div class="sel"><div class="angka" id="rDalam">0</div><div class="label">Masih di dalam</div></div>
-        <div class="sel"><div class="angka" id="rSelesai">0</div><div class="label">Selesai</div></div>
+        <div class="sel"><div class="angka" id="rTotal">0</div><div class="label">Total</div><div class="ket" id="rTotalKet"></div></div>
+        <div class="sel"><div class="angka" id="rDalam">0</div><div class="label">Masih di dalam</div><div class="ket" id="rDalamKet"></div></div>
+        <div class="sel"><div class="angka" id="rSelesai">0</div><div class="label">Selesai</div><div class="ket" id="rSelesaiKet"></div></div>
+        <div class="sel"><div class="angka" id="rRata">-</div><div class="label">Rata-rata durasi</div><div class="ket" id="rRataKet"></div></div>
+      </div>
+      <div id="panelDalam" hidden>
+        <h2 class="judul-panel">Masih di dalam sekarang</h2>
+        <p class="ket-panel">Diurutkan dari yang paling lama. Merah berarti sudah lebih dari 3 jam, layak dicek petugas.</p>
+        <div id="mDalam"></div>
       </div>
       <div class="cari">
         <input type="text" id="mCari" placeholder="Cari nama, asal, atau keperluan" aria-label="Cari kunjungan">
@@ -584,7 +593,7 @@ $('tautanIsiLagi').addEventListener('click', e => {
 });
 
 /* ===== Admin ===== */
-$('tautanAdmin').addEventListener('click', e => { e.preventDefault(); tampilkan('admin'); });
+/* Admin dibuka lewat tautan sendiri: alamat aplikasi + ?admin (tanpa tautan di formulir tamu). */
 $('tautanKembali').addEventListener('click', e => { e.preventDefault(); tampilkan('form'); });
 $('tautanSiapkan').addEventListener('click', e => {
   e.preventDefault();
@@ -642,7 +651,41 @@ let daftarKunjungan = [], saringAktif = 'semua', idDetail = null, tundaCari = nu
 function inisial(nama) {
   return nama.split(/\s+/).slice(0, 2).map(k => k[0] || '').join('').toUpperCase() || '?';
 }
+function durasiTeks(menit) {
+  if (menit == null) return '-';
+  const j = Math.floor(menit / 60), m = menit % 60;
+  return j > 0 ? j + ' j ' + String(m).padStart(2, '0') + ' m' : m + ' m';
+}
+function pilHtml(k) {
+  if (k.status === 'TERBUKA') {
+    if (k.menit == null) return '<span class="pil pil-terbuka">TERBUKA</span>';
+    const cls = k.menit > 180 ? 'pil pil-lama' : 'pil pil-terbuka';
+    return '<span class="' + cls + '">DI DALAM ' + durasiTeks(k.menit) + '</span>';
+  }
+  return '<span class="pil pil-selesai">SELESAI' + (k.selesai ? ' ' + k.selesai : '') + '</span>';
+}
+function buatBarisTamu(k) {
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'baris-tamu'; btn.dataset.id = k.id;
+  const foto = k.fotoKecil
+    ? '<img alt="" src="' + k.fotoKecil + '">'
+    : '<span class="avatar-inisial" aria-hidden="true">' + inisial(k.nama) + '</span>';
+  btn.innerHTML = foto + '<span class="isi"><span class="nm"></span><span class="mt"></span></span>' + pilHtml(k);
+  btn.querySelector('.nm').textContent = k.nama;
+  btn.querySelector('.mt').textContent = k.asal + ' · ' + k.datang + ' · ' + k.perlu;
+  btn.addEventListener('click', () => bukaDetail(k.id));
+  return btn;
+}
 function gambarMonitoring() {
+  /* Panel masih di dalam: hanya untuk kunjungan terbuka berdurasi (hari ini), terlama di atas. */
+  const dalam = daftarKunjungan
+    .filter(k => k.status === 'TERBUKA' && k.menit != null)
+    .sort((a, b) => b.menit - a.menit);
+  $('panelDalam').hidden = dalam.length === 0;
+  const bungkusDalam = $('mDalam');
+  bungkusDalam.innerHTML = '';
+  for (const k of dalam) bungkusDalam.appendChild(buatBarisTamu(k));
+
   const bungkus = $('mDaftar');
   bungkus.innerHTML = '';
   let tampil = 0;
@@ -650,19 +693,7 @@ function gambarMonitoring() {
     if (saringAktif === 'terbuka' && k.status !== 'TERBUKA') continue;
     if (saringAktif === 'selesai' && k.status !== 'SELESAI') continue;
     tampil++;
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'baris-tamu'; btn.dataset.id = k.id;
-    const foto = k.fotoKecil
-      ? '<img alt="" src="' + k.fotoKecil + '">'
-      : '<span class="avatar-inisial" aria-hidden="true">' + inisial(k.nama) + '</span>';
-    const pil = k.status === 'TERBUKA'
-      ? '<span class="pil pil-terbuka">TERBUKA</span>'
-      : '<span class="pil pil-selesai">SELESAI' + (k.selesai ? ' ' + k.selesai : '') + '</span>';
-    btn.innerHTML = foto + '<span class="isi"><span class="nm"></span><span class="mt"></span></span>' + pil;
-    btn.querySelector('.nm').textContent = k.nama;
-    btn.querySelector('.mt').textContent = k.asal + ' · ' + k.datang + ' · ' + k.perlu;
-    btn.addEventListener('click', () => bukaDetail(k.id));
-    bungkus.appendChild(btn);
+    bungkus.appendChild(buatBarisTamu(k));
   }
   $('mKosong').classList.toggle('tampil', tampil === 0);
   $('mKosongTeks').textContent = daftarKunjungan.length === 0
@@ -674,9 +705,15 @@ async function muatMonitoring(diam) {
   try {
     const d = await api('daftarKunjungan', { tokenSesi: sesiAdmin.token, tanggal: $('mTanggal').value, cari: $('mCari').value.trim() });
     daftarKunjungan = d.daftar;
-    $('rTotal').textContent = d.ringkasan.total;
-    $('rDalam').textContent = d.ringkasan.terbuka;
-    $('rSelesai').textContent = d.ringkasan.selesai;
+    const rg = d.ringkasan;
+    $('rTotal').textContent = rg.total;
+    $('rTotalKet').textContent = 'Kemarin ' + (rg.totalKemarin || 0);
+    $('rDalam').textContent = rg.terbuka;
+    $('rDalamKet').textContent = rg.dalamTerlamaMenit != null ? 'Paling lama ' + durasiTeks(rg.dalamTerlamaMenit) : '';
+    $('rSelesai').textContent = rg.selesai;
+    $('rSelesaiKet').textContent = 'dari ' + rg.total + ' kunjungan';
+    $('rRata').textContent = durasiTeks(rg.rataMenit);
+    $('rRataKet').textContent = rg.terlamaMenit != null ? 'Terlama ' + durasiTeks(rg.terlamaMenit) : '';
     gambarMonitoring();
   } catch (err) {
     if (!diam) { bunyiGalat(); toast(err.message); }
@@ -728,7 +765,12 @@ $('dSelesai').addEventListener('click', async () => {
 });
 
 /* ===== Mulai ===== */
-if (kunjunganSaya && kunjunganSaya.nomor) { isiKartu(kunjunganSaya); tampilkan('kartu'); }
+const modeAdmin = new URLSearchParams(location.search).has('admin');
+if (modeAdmin) {
+  if (sesiAdmin && sesiAdmin.token) { tampilkan('monitoring'); muatMonitoring(); }
+  else tampilkan('admin');
+}
+else if (kunjunganSaya && kunjunganSaya.nomor) { isiKartu(kunjunganSaya); tampilkan('kartu'); }
 else tampilkan('form');
 </script>
 </body>
