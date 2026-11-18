@@ -247,17 +247,7 @@ dialog::backdrop{background:rgba(43,36,22,.35)}
           <p class="galat" id="gHp">Nomor HP wajib diisi dengan benar.</p>
 
           <label for="fPerlu"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5.5a3 3 0 0 1 6 0"/><path d="M9.5 12h5M9.5 16h5"/></svg>Keperluan <span class="wajib" aria-hidden="true">*</span></label>
-          <select id="fPerlu">
-            <option value="">Pilih keperluan</option>
-            <option>Mengantar surat atau berkas</option>
-            <option>Rapat atau koordinasi</option>
-            <option>Konsultasi</option>
-            <option>Mengikuti pelatihan</option>
-            <option>Penawaran kerja sama</option>
-            <option>Kunjungan dinas</option>
-            <option value="Lainnya">Lainnya</option>
-          </select>
-          <input type="text" id="fPerluLain" placeholder="Tulis keperluan Anda" hidden style="margin-top:8px">
+          <input type="text" id="fPerlu" placeholder="Tulis keperluan kunjungan Anda">
           <p class="galat" id="gPerlu">Keperluan wajib diisi.</p>
 
           <label for="fTuju"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.9-2.8 2.9-4.2 5.5-4.2s4.6 1.4 5.5 4.2"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.8 15.1c1.4.6 2.3 1.8 2.8 3.9"/></svg>Orang yang dituju <span class="ops">(opsional)</span></label>
@@ -517,16 +507,11 @@ function isiKartu(k) {
   }
 }
 
-/* ===== Keperluan: pilihan Lainnya membuka isian bebas ===== */
-$('fPerlu').addEventListener('change', () => { $('fPerluLain').hidden = $('fPerlu').value !== 'Lainnya'; });
-
 /* ===== Kirim formulir ===== */
 $('formTamu').addEventListener('submit', async e => {
   e.preventDefault();
   const nama = $('fNama').value.trim(), asal = $('fAsal').value.trim(),
-    hpMentah = $('fHp').value.trim(), dituju = $('fTuju').value.trim();
-  const perluPilihan = $('fPerlu').value;
-  const perlu = perluPilihan === 'Lainnya' ? $('fPerluLain').value.trim() : perluPilihan;
+    hpMentah = $('fHp').value.trim(), perlu = $('fPerlu').value.trim(), dituju = $('fTuju').value.trim();
   const digit = hpMentah.replace(/[^0-9]/g, '');
   let sah = true;
   sah = setGalat($('fNama'), $('gNama'), !nama) && sah;
@@ -630,7 +615,7 @@ $('tautanIsiLagi').addEventListener('click', e => {
   e.preventDefault();
   kunjunganSaya = null;
   try { sessionStorage.removeItem('btKunjungan'); } catch (err) { }
-  $('formTamu').reset(); $('fPerluLain').hidden = true;
+  $('formTamu').reset();
   fotoData = ''; $('kotakFoto').classList.remove('terisi'); $('btnFoto').textContent = 'Ambil Foto';
   tampilkan('form');
 });
